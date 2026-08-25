@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test",
     "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply task-monitor-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply task-monitor-db --remote",
     "db:seed": "wrangler d1 execute task-monitor-db --local --file scripts/seed.sql",

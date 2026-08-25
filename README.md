@@ -78,6 +78,28 @@ Resend keeps the same handle (the client only ever posts `{ email }`).
 | `pnpm db:migrate` / `pnpm db:seed` | Apply local D1 migrations / seed |
 | `pnpm --filter @task-monitor/api db:migrate:remote` / `db:seed:remote` | Same against production D1 |
 
+## Database workflow (Drizzle → D1)
+
+The schema lives in `apps/api/src/db/schema.ts`. Never hand-write SQL:
+
+```bash
+# 1. Edit apps/api/src/db/schema.ts, then generate a migration:
+pnpm --filter @task-monitor/api db:generate
+
+# 2. Review the file it created in apps/api/migrations/000X_*.sql
+
+# 3a. Apply locally (miniflare D1 in .wrangler/state):
+pnpm db:migrate
+
+# 3b. Apply to Cloudflare:
+pnpm --filter @task-monitor/api db:migrate:remote
+```
+
+Wrangler tracks applied migrations inside each database (`d1_migrations`
+table), so local and remote progress independently. Seed data
+(`scripts/seed.sql`) is separate and idempotent per-fresh-database:
+`pnpm db:seed` / `db:seed:remote`.
+
 ## Deploying the API
 
 ```bash
@@ -91,9 +113,9 @@ wrangler kv namespace create KV           # put the id into wrangler.jsonc
 wrangler secret put JWT_SECRET
 wrangler secret put ENVIRONMENT           # e.g. "production"
 
-# Ship it
+# Ship it — schema first, then the worker
 pnpm db:migrate:remote
-pnpm db:seed:remote        # optional demo content
+pnpm db:seed:remote        # optional demo content (includes admin login)
 pnpm deploy
 ```
 
