@@ -67,12 +67,21 @@ export default function ChatThread() {
   }, [conversationId, user?.id, queryClient]);
 
   useEffect(() => {
-    if (conversation) navigation.setOptions({ title: conversation.title });
+    if (!conversation) return;
+    navigation.setOptions({
+      title: conversation.title,
+      headerSubtitle:
+        conversation.kind === 'forum'
+          ? `${conversation.participantIds.length} members`
+          : undefined,
+    } as never);
   }, [conversation, navigation]);
 
   const sendMutation = useMutation({
     mutationFn: (content: string) =>
-      chatService.sendMessage({ recipientId: String(conversation?.recipientId), content }),
+      conversation?.kind === 'forum'
+        ? chatService.sendMessage({ conversationId, content })
+        : chatService.sendMessage({ recipientId: String(conversation?.recipientId), content }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
@@ -82,7 +91,8 @@ export default function ChatThread() {
 
   const submit = () => {
     const body = draft.trim();
-    if (!body || !conversation?.recipientId) return;
+    if (!body) return;
+    if (conversation?.kind === 'direct' && !conversation?.recipientId) return;
     setDraft('');
     sendMutation.mutate(body);
   };
@@ -127,6 +137,9 @@ export default function ChatThread() {
                   )}
                   <View style={[styles.bubbleRow, mine ? styles.rowMine : styles.rowTheirs]}>
                     <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      {conversation?.kind === 'forum' && !mine && (
+                        <Text style={styles.senderName}>{m.senderName}</Text>
+                      )}
                       <Text style={[styles.body, mine && styles.bodyMine]}>{m.body}</Text>
                       <View style={styles.metaRow}>
                         <Text style={[styles.meta, mine && styles.metaMine]}>
@@ -219,6 +232,12 @@ const makeStyles = ({ c, radius, spacing }: StyleFactoryArgs) =>
     },
     body: { color: c.text, fontSize: 14.5, lineHeight: 20 },
     bodyMine: { color: c.onAccent },
+    senderName: {
+      color: c.accentMuted,
+      fontSize: 10.5,
+      fontWeight: '700',
+      marginBottom: 2,
+    },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',

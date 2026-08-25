@@ -49,6 +49,9 @@ export const API = {
   conversation: (id: string | number) => `/v1/chat/conversations/${id}/`,
   /** Marks my received messages in a thread as read. */
   conversationRead: (id: string | number) => `/v1/chat/conversations/${id}/read/`,
+  /** Group rooms (the whole-team room auto-exists here). */
+  GROUPS: '/v1/chat/groups/',
+  groupMembers: (id: string | number) => `/v1/chat/groups/${id}/members/`,
   MESSAGES: '/v1/chat/messages/',
 
   // ── Documents (PRD 11.3) ────────────────────────────────────────────────

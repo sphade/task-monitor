@@ -96,7 +96,13 @@ export default function ChatList() {
                 style={unread ? styles.unreadCard : undefined}
               >
                 <View style={styles.row}>
-                  <Avatar name={conv.title} size={46} />
+                  {conv.kind === 'forum' ? (
+                    <View style={styles.groupAvatar}>
+                      <Ionicons name="people" size={22} color={colors.onAccent} />
+                    </View>
+                  ) : (
+                    <Avatar name={conv.title} size={46} />
+                  )}
                   <View style={{ flex: 1 }}>
                     <View style={styles.titleRow}>
                       <Text style={[styles.title, unread && styles.titleUnread]} numberOfLines={1}>
@@ -139,6 +145,14 @@ const makeStyles = ({ c, spacing }: StyleFactoryArgs) =>
     screen: { flex: 1, backgroundColor: c.background },
     list: { padding: spacing.lg, paddingBottom: spacing.xxl * 3, gap: spacing.md },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    groupAvatar: {
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      backgroundColor: c.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     title: { color: c.text, fontSize: 15, fontWeight: '600', flex: 1 },
     titleUnread: { fontWeight: '800' },

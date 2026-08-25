@@ -17,14 +17,14 @@
     {
       "binding": "DB",
       "database_name": "task-monitor-db",
-      "database_id": "REPLACE_WITH_D1_ID",
+      "database_id": "7812d88d-a58f-43e0-b56e-24223528ba8b",
       "migrations_dir": "migrations"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "REPLACE_WITH_KV_ID"
+      "id": "6deeec7b77474194b22cc486bf2fae35"
     }
   ],
   "durable_objects": {

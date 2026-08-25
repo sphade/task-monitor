@@ -1,23 +1,21 @@
-import { privateApi, toArray } from '@/lib/api';
+import { privateApi, toArray, unwrap } from '@/lib/api';
 import { API } from '@/lib/endpoints';
 import type { Conversation, Message } from '@/types';
-import type { SendMessageDto } from '@/types/api';
+import type { GroupDto, SendMessageDto } from '@/types/api';
 
 /**
  * Chat service.
  *
- * The API is **message-centric** — there is no Conversation resource:
+ * Two kinds of threads:
  *
- *   GET  /v1/chat/conversations/       → paginated list of messages
- *   GET  /v1/chat/conversations/{id}/  → messages for conversation {id}
- *   POST /v1/chat/messages/            → send { content, recipient }
+ *   - **Direct** (message-centric, as the original Django API): a "conversation
+ *     list" is derived by grouping the caller's flat message list on
+ *     `conversation`, keeping the most recent of each. Sending takes a
+ *     `recipient`; the server find-or-creates the thread.
+ *   - **Groups** (`/v1/chat/groups/`): server-side rooms with real membership
+ *     and per-member unread counts. The whole-team room ("Team") always exists.
  *
- * So a "conversation list" is derived by grouping messages on `conversation` and
- * keeping the most recent of each. Message rows carry only numeric `sender` /
- * `recipient` ids, so display names are resolved from the staff directory.
- *
- * Threads are strictly 1-on-1: sending takes a `recipient`, and the server
- * find-or-creates the thread, which is why duplicates are impossible.
+ * `listConversations` merges both into one list for the chat tab.
  */
 
 /** History is available now that conversation detail returns messages. */
@@ -40,7 +38,18 @@ function mapMessage(dto: SendMessageDto, names: NameLookup = {}): Message {
   };
 }
 
-/** Collapses a flat message list into one entry per thread. */
+function mapGroup(g: GroupDto): Conversation {
+  return {
+    id: String(g.id),
+    kind: 'forum',
+    participantIds: g.member_ids.map(String),
+    title: g.name,
+    lastMessageAt: g.last_message_at ?? undefined,
+    unreadCount: g.unread_count,
+  };
+}
+
+/** Collapses a flat DIRECT-message list into one entry per thread. */
 function groupIntoConversations(
   messages: Message[],
   rawById: Map<string, SendMessageDto>,
@@ -56,7 +65,7 @@ function groupIntoConversations(
     if (!current || m.createdAt > current.createdAt) latest.set(m.conversationId, m);
 
     const raw = rawById.get(m.id);
-    if (raw) {
+    if (raw && raw.recipient !== null) {
       // The counterpart is whichever side of the message is not the viewer.
       const other =
         String(raw.sender) === viewerId ? String(raw.recipient) : String(raw.sender);
@@ -93,12 +102,32 @@ export const chatService = {
     return toArray<SendMessageDto>(res);
   },
 
-  /** Threads derived from the caller's messages, most recent activity first. */
+  /** Group rooms I belong to (includes the auto-provisioned Team room). */
+  async listGroups(): Promise<Conversation[]> {
+    const res = await privateApi.get(API.GROUPS);
+    const data = unwrap<GroupDto[]>(res) ?? [];
+    return data.map(mapGroup);
+  },
+
+  /**
+   * Threads derived from the caller's direct messages plus their group rooms,
+   * most recent activity first. Groups without traffic still appear.
+   */
   async listConversations(viewerId: string, names: NameLookup = {}): Promise<Conversation[]> {
-    const raw = await chatService.listAllMessages();
-    const rawById = new Map(raw.map((d) => [String(d.id), d]));
-    const messages = raw.map((d) => mapMessage(d, names));
-    return groupIntoConversations(messages, rawById, viewerId, names);
+    const [groups, raw] = await Promise.all([
+      chatService.listGroups(),
+      chatService.listAllMessages(),
+    ]);
+    const groupIds = new Set(groups.map((g) => g.id));
+
+    const directRaw = raw.filter((d) => !groupIds.has(String(d.conversation)));
+    const rawById = new Map(directRaw.map((d) => [String(d.id), d]));
+    const directMessages = directRaw.map((d) => mapMessage(d, names));
+    const direct = groupIntoConversations(directMessages, rawById, viewerId, names);
+
+    return [...groups, ...direct].sort((a, b) =>
+      (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''),
+    );
   },
 
   async getConversation(
@@ -110,7 +139,7 @@ export const chatService = {
     return all.find((c) => c.id === id);
   },
 
-  /** Messages in one thread, oldest first. */
+  /** Messages in one thread (direct or group), oldest first. */
   async listMessages(conversationId: string, names: NameLookup = {}): Promise<Message[]> {
     const res = await privateApi.get(API.conversation(conversationId));
     // The endpoint is annotated as a single object but returns the thread, so
@@ -121,19 +150,24 @@ export const chatService = {
   },
 
   /**
-   * Sends a message. The server derives `sender` from the JWT and resolves the
-   * conversation from `recipient`, creating it on first contact.
+   * Sends a message. Direct threads take `recipientId`; group/forum threads
+   * take `conversationId`. The server derives the sender from the JWT.
    */
-  async sendMessage(input: { recipientId: string; content: string }): Promise<Message> {
-    const res = await privateApi.post(API.MESSAGES, {
-      recipient: Number(input.recipientId),
-      content: input.content,
-    });
+  async sendMessage(input: {
+    recipientId?: string;
+    conversationId?: string;
+    content: string;
+  }): Promise<Message> {
+    const payload = input.conversationId !== undefined
+      ? { conversation: Number(input.conversationId), content: input.content }
+      : { recipient: Number(input.recipientId), content: input.content };
+
+    const res = await privateApi.post(API.MESSAGES, payload);
     const dto = (res.data?.data ?? res.data) as SendMessageDto;
     return mapMessage(dto);
   },
 
-  /** Marks my received messages in a thread as read (read receipts). */
+  /** Marks my position in a thread read (works for direct and groups). */
   async markConversationRead(conversationId: string): Promise<void> {
     await privateApi.post(API.conversationRead(conversationId), {}).catch(() => {
       // Best-effort — read state must never block the UI.

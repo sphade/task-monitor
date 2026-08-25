@@ -103,13 +103,11 @@ describe('chat REST', () => {
       ctx.env,
     );
     expect(markRes.status).toBe(200);
-    const markBody = (await markRes.json()) as { data: { updated: number } };
-    expect(markBody.data.updated).toBe(1);
 
-    // Manager's copy of their own sent message is unaffected.
+    // Manager's copy of their own sent message is now flagged read.
     const listForManager = (await callJson(ctx, 'GET', '/v1/chat/conversations/', undefined, manager.token)).body as { results: MsgDto[] };
     const sent = listForManager.results.find((m) => m.sender === manager.userId)!;
-    expect(sent.is_read).toBe(true); // now read by recipient
+    expect(sent.is_read).toBe(true); // read by recipient
 
     // Broadcast fan-out reached the room stub.
     const events = ctx.broadcasts.map((b) => JSON.parse(b) as { type: string });

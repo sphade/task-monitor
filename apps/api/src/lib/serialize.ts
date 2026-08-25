@@ -237,7 +237,8 @@ export interface MessageDto {
   content: string;
   conversation: number;
   sender: number;
-  recipient: number;
+  /** Null for group messages — they broadcast to every member. */
+  recipient: number | null;
   status: string;
   is_read: boolean;
   created_at: string;

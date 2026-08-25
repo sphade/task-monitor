@@ -208,16 +208,35 @@ export type ServerMessageStatus = 'sent' | 'delivered' | 'read';
  * `GET /v1/chat/conversations/` returns a paginated list of messages, and
  * `GET /v1/chat/conversations/{conversationId}/` returns that thread's messages.
  */
+/**
+ * Message rows are thread-scoped. Direct messages carry the other party in
+ * `recipient`; group messages have `recipient: null` (they broadcast).
+ */
 export interface SendMessageDto {
   id: number;
   content: string;
   conversation: number;
   sender: number;
-  recipient: number;
+  recipient: number | null;
   status?: ServerMessageStatus;
   is_read?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** Group room from GET /v1/chat/groups/. */
+export interface GroupDto {
+  id: number;
+  kind: 'group';
+  name: string;
+  is_team: boolean;
+  created_by: number | null;
+  created_by_name?: string | null;
+  member_ids: number[];
+  member_count: number;
+  unread_count: number;
+  last_message_at: string | null;
+  created_at: string;
 }
 
 // ── Documents ─────────────────────────────────────────────────────────────
