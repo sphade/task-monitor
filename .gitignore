@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.turbo/
+.wrangler/
+.expo/
+*.local
+.env
+.dev.vars
+coverage/
+*.tsbuildinfo
+.DS_Store

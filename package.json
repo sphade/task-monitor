@@ -1,0 +1,21 @@
+{
+  "name": "task-monitor",
+  "private": true,
+  "packageManager": "pnpm@10.29.1",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:api": "turbo run dev --filter=@task-monitor/api",
+    "dev:mobile": "turbo run start --filter=@task-monitor/mobile",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter @task-monitor/api db:migrate",
+    "db:seed": "pnpm --filter @task-monitor/api db:seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.8",
+    "typescript": "~5.9.3"
+  }
+}

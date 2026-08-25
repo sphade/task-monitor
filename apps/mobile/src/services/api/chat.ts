@@ -1,0 +1,142 @@
+import { privateApi, toArray } from '@/lib/api';
+import { API } from '@/lib/endpoints';
+import type { Conversation, Message } from '@/types';
+import type { SendMessageDto } from '@/types/api';
+
+/**
+ * Chat service.
+ *
+ * The API is **message-centric** — there is no Conversation resource:
+ *
+ *   GET  /v1/chat/conversations/       → paginated list of messages
+ *   GET  /v1/chat/conversations/{id}/  → messages for conversation {id}
+ *   POST /v1/chat/messages/            → send { content, recipient }
+ *
+ * So a "conversation list" is derived by grouping messages on `conversation` and
+ * keeping the most recent of each. Message rows carry only numeric `sender` /
+ * `recipient` ids, so display names are resolved from the staff directory.
+ *
+ * Threads are strictly 1-on-1: sending takes a `recipient`, and the server
+ * find-or-creates the thread, which is why duplicates are impossible.
+ */
+
+/** History is available now that conversation detail returns messages. */
+export const CHAT_HISTORY_SUPPORTED = true;
+
+/** id → display name, so message rows can show who is speaking. */
+export type NameLookup = Record<string, string>;
+
+function mapMessage(dto: SendMessageDto, names: NameLookup = {}): Message {
+  const senderId = String(dto.sender);
+  return {
+    id: String(dto.id),
+    conversationId: String(dto.conversation),
+    senderId,
+    senderName: names[senderId] ?? `User ${senderId}`,
+    body: dto.content,
+    createdAt: dto.created_at,
+    isRead: dto.is_read ?? dto.status === 'read',
+    status: dto.status,
+  };
+}
+
+/** Collapses a flat message list into one entry per thread. */
+function groupIntoConversations(
+  messages: Message[],
+  rawById: Map<string, SendMessageDto>,
+  viewerId: string,
+  names: NameLookup,
+): Conversation[] {
+  const latest = new Map<string, Message>();
+  const unread = new Map<string, number>();
+  const otherParty = new Map<string, string>();
+
+  for (const m of messages) {
+    const current = latest.get(m.conversationId);
+    if (!current || m.createdAt > current.createdAt) latest.set(m.conversationId, m);
+
+    const raw = rawById.get(m.id);
+    if (raw) {
+      // The counterpart is whichever side of the message is not the viewer.
+      const other =
+        String(raw.sender) === viewerId ? String(raw.recipient) : String(raw.sender);
+      otherParty.set(m.conversationId, other);
+
+      // Unread means: addressed to me and not yet read.
+      if (String(raw.recipient) === viewerId && !(raw.is_read ?? raw.status === 'read')) {
+        unread.set(m.conversationId, (unread.get(m.conversationId) ?? 0) + 1);
+      }
+    }
+  }
+
+  return [...latest.entries()]
+    .map(([conversationId, message]) => {
+      const recipientId = otherParty.get(conversationId) ?? '';
+      return {
+        id: conversationId,
+        kind: 'direct' as const,
+        participantIds: [viewerId, recipientId],
+        recipientId,
+        title: names[recipientId] ?? `User ${recipientId}`,
+        lastMessage: message.body,
+        lastMessageAt: message.createdAt,
+        unreadCount: unread.get(conversationId) ?? 0,
+      };
+    })
+    .sort((a, b) => (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? ''));
+}
+
+export const chatService = {
+  /** Every message visible to the caller, newest first. */
+  async listAllMessages(): Promise<SendMessageDto[]> {
+    const res = await privateApi.get(API.CONVERSATIONS, { params: { size: 200 } });
+    return toArray<SendMessageDto>(res);
+  },
+
+  /** Threads derived from the caller's messages, most recent activity first. */
+  async listConversations(viewerId: string, names: NameLookup = {}): Promise<Conversation[]> {
+    const raw = await chatService.listAllMessages();
+    const rawById = new Map(raw.map((d) => [String(d.id), d]));
+    const messages = raw.map((d) => mapMessage(d, names));
+    return groupIntoConversations(messages, rawById, viewerId, names);
+  },
+
+  async getConversation(
+    id: string,
+    viewerId: string,
+    names: NameLookup = {},
+  ): Promise<Conversation | undefined> {
+    const all = await chatService.listConversations(viewerId, names);
+    return all.find((c) => c.id === id);
+  },
+
+  /** Messages in one thread, oldest first. */
+  async listMessages(conversationId: string, names: NameLookup = {}): Promise<Message[]> {
+    const res = await privateApi.get(API.conversation(conversationId));
+    // The endpoint is annotated as a single object but returns the thread, so
+    // normalise both shapes.
+    return toArray<SendMessageDto>(res)
+      .map((d) => mapMessage(d, names))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+
+  /**
+   * Sends a message. The server derives `sender` from the JWT and resolves the
+   * conversation from `recipient`, creating it on first contact.
+   */
+  async sendMessage(input: { recipientId: string; content: string }): Promise<Message> {
+    const res = await privateApi.post(API.MESSAGES, {
+      recipient: Number(input.recipientId),
+      content: input.content,
+    });
+    const dto = (res.data?.data ?? res.data) as SendMessageDto;
+    return mapMessage(dto);
+  },
+
+  /** Marks my received messages in a thread as read (read receipts). */
+  async markConversationRead(conversationId: string): Promise<void> {
+    await privateApi.post(API.conversationRead(conversationId), {}).catch(() => {
+      // Best-effort — read state must never block the UI.
+    });
+  },
+};

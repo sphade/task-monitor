@@ -1,0 +1,67 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "base": {
+      "node": "20.19.4",
+      "pnpm": "10.29.1",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8787"
+      }
+    },
+
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://localhost:8787",
+        "EXPO_PUBLIC_FEATURE_CHAT": "true",
+        "EXPO_PUBLIC_FEATURE_DOCS": "true",
+        "EXPO_PUBLIC_FEATURE_KANBAN": "true"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      }
+    },
+
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging.api.orangeinventhouse.com",
+        "EXPO_PUBLIC_FEATURE_CHAT": "true",
+        "EXPO_PUBLIC_FEATURE_DOCS": "true",
+        "EXPO_PUBLIC_FEATURE_KANBAN": "true"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+
+    "production": {
+      "extends": "base",
+
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.orangeinventhouse.com",
+        "EXPO_PUBLIC_FEATURE_CHAT": "false",
+        "EXPO_PUBLIC_FEATURE_DOCS": "false",
+        "EXPO_PUBLIC_FEATURE_KANBAN": "true"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

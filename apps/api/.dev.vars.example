@@ -1,0 +1,4 @@
+# Local development secrets for wrangler dev — never commit the real one.
+JWT_SECRET=dev-only-secret-change-me
+ENVIRONMENT=development
+DEBUG_SHOW_OTP=true
