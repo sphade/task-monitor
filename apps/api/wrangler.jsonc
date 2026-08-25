@@ -1,7 +1,7 @@
 // Wrangler configuration for the task-monitor API.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "task-monitor-api",
+  "name": "task-monitor",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-23",
   "compatibility_flags": ["nodejs_compat"],

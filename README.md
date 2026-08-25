@@ -124,9 +124,12 @@ Routing — before public launch.
 - **console** — `dashboard/overview/`, `staff/`, `departments/`, `roles/`
   (+ `add-permissions/`, `remove-permissions/`), `permissions/`,
   `user-dropdown/`
-- **chat** — `conversations/` (my messages), `conversations/{id}/` (thread),
-  `messages/` (send `{recipient,content}`), `conversations/{id}/read/`,
-  `ws/{id}/?token=` (realtime)
+- **chat** — direct *and* group rooms: `conversations/` (my messages),
+  `conversations/{id}/` (thread), `messages/` (send `{recipient,content}` for
+  direct or `{conversation,content}` for groups), `conversations/{id}/read/`,
+  `groups/` (list incl. per-group unreads · create · add/remove members;
+  a whole-team room named **Team** is auto-provisioned and mirrors active
+  staff), `ws/{id}/?token=` (realtime)
 - **documents** — PRD/SDD slots per project with version history
   (`documents/`, `documents/{id}/revisions/`, `documents/comments/`)
 - **audit** — append-only trail of logins & mutations
